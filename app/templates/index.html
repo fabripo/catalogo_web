@@ -192,6 +192,32 @@
             }
             aplicarFiltros();
         }
-    </script>
+</script> 
+<!-- Reproductor discreto con Autoplay y sin opción de descarga -->
+<div style="position: fixed; bottom: 15px; right: 15px; background: rgba(0,0,0,0.85); padding: 8px 12px; border-radius: 25px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 1000; display: flex; align-items: center;">
+    <audio id="audioDenis" controls controlsList="nodownload" autoplay style="height: 30px; width: 200px;">
+        <source src="{{ url_for('static', path='audio/sergio_denis.mp3') }}" type="audio/mpeg">
+        Tu navegador no soporta el reproductor de audio.
+    </audio>
+</div>
+
+<!-- Script para iniciar el audio al hacer clic -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const audio = document.getElementById("audioDenis");
+        
+        // Intentar reproducir automáticamente
+        audio.play().catch(function (error) {
+            console.log("El navegador bloqueó el autoplay. Se reproducirá al hacer el primer clic.");
+            
+            // Si el navegador bloquea el sonido de entrada, se activa al primer clic en cualquier parte de la pantalla
+            const iniciarAudio = function () {
+                audio.play();
+                document.removeEventListener("click", iniciarAudio);
+            };
+            document.addEventListener("click", iniciarAudio);
+        });
+    });
+</script>
 </body>
 </html>
