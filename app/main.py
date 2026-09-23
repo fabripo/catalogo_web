@@ -140,25 +140,24 @@ def restaurar_base_de_datos(
 
 @app.get("/admin/descargar-zip")
 def descargar_backup_completo_zip(_user: str = Depends(verificar_admin)):
-    # Crear un archivo ZIP temporal en la PC
-    temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+    temp_dir = tempfile.gettempdir()
+    zip_path = os.path.join(temp_dir, "backup_completo_proyecto.zip")
     base_dir = os.getcwd()
     
-    # Excluir entornos virtuales, cache y Git
     excluir = {'.venv', 'venv', '.git', '__pycache__', '.pytest_cache'}
 
-    with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(base_dir):
             dirs[:] = [d for d in dirs if d not in excluir]
             for file in files:
-                if file.endswith('.zip'):
+                if file.endswith(('.zip', '.pyc', '.db-journal')):
                     continue
                 archivo_completo = os.path.join(root, file)
                 ruta_relativa = os.path.relpath(archivo_completo, base_dir)
                 zipf.write(archivo_completo, ruta_relativa)
 
     return FileResponse(
-        path=temp_zip.name, 
+        path=zip_path, 
         filename="backup_completo_proyecto.zip", 
         media_type="application/zip"
     )
