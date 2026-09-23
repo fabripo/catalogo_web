@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración del Catálogo</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+    <!-- NAVBAR CON BOTONES DE RESPALDO Y RESTAURACIÓN -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/"><i class="bi bi-shop me-2"></i>Mi Catálogo</a>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-success btn-sm" href="/admin/descargar-db" title="Descargar copia de la base de datos">
+                    <i class="bi bi-download me-1"></i> Respaldar DB
+                </a>
+                
+                <!-- Input de archivo oculto para restaurar DB -->
+                <input type="file" id="inputRestaurarDb" accept=".db,.sqlite,.sqlite3" style="display: none;" onchange="restaurarDb(this)">
+                <button class="btn btn-outline-warning btn-sm" onclick="document.getElementById('inputRestaurarDb').click()" title="Subir backup y reemplazar la base actual">
+                    <i class="bi bi-upload me-1"></i> Restaurar DB
+                </button>
+
+                <a class="btn btn-outline-light btn-sm" href="/"><i class="bi bi-arrow-left me-1"></i>Volver a la Web</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <div class="row">
+            <!-- COLUMNA IZQUIERDA: FORMULARIOS DE CARGA -->
+            <div class="col-md-5 mb-4">
+                
+                <!-- GESTIÓN DE CATEGORÍAS -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-tags me-1"></i> Administrar Categorías</h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="form-categoria" class="d-flex gap-2 mb-3">
+                            <input type="text" id="nueva-categoria-nombre" class="form-control form-control-sm" placeholder="Nueva categoría..." required>
+                            <button type="submit" class="btn btn-dark btn-sm fw-semibold text-nowrap">
+                                <i class="bi bi-plus-lg"></i> Crear
+                            </button>
+                        </form>
+
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for c in categorias_obj %}
+                                <span class="badge bg-light text-dark border p-2 d-inline-flex align-items-center">
+                                    {{ c.nombre }}
+                                    <i class="bi bi-x-circle-fill text-danger ms-2" style="cursor: pointer;" onclick="eliminarCategoria({{ c.id }}, '{{ c.nombre }}')" title="Eliminar categoría"></i>
+                                </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FORMULARIO PARA AGREGAR NUEVO PRODUCTO -->
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-plus-circle me-1"></i> Agregar Nuevo Producto</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="form-producto">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Título</label>
+                                <input type="text" id="titulo" class="form-control" placeholder="Ej: Remera Cotton" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Categoría</label>
+                                <select id="categoria" class="form-select" required>
+                                    <option value="" disabled selected>Seleccionar categoría...</option>
+                                    {% for cat in categorias %}
+                                        <option value="{{ cat }}">{{ cat }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Precio y Moneda</label>
+                                <div class="input-group">
+                                    <select id="moneda" class="form-select" style="max-width: 110px;">
+                                        <option value="ARS">ARS ($)</option>
+                                        <option value="USD">USD (US$)</option>
+                                    </select>
+                                    <input type="text" id="precio" class="form-control" placeholder="15.000" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Subir imagen desde PC</label>
+                                <input type="file" id="imagen_archivo" class="form-control" accept="image/*">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">O pegar URL de Imagen</label>
+                                <input type="url" id="imagen_url" class="form-control" placeholder="https://...">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Descripción</label>
+                                <textarea id="descripcion" class="form-control" rows="3" placeholder="Detalles del producto..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100 fw-semibold">
+                                <i class="bi bi-check-circle me-1"></i> Guardar Producto
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUMNA DERECHA: TABLA DE PRODUCTOS -->
+            <div class="col-md-7">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold"><i class="bi bi-box-seam me-1"></i> Productos</h5>
+                    </div>
+                    
+                    <div class="p-3 bg-white border-bottom">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                            <input type="text" id="buscarAdmin" class="form-control" placeholder="Buscar en la tabla por nombre o categoría...">
+                        </div>
+                    </div>
+
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" id="tablaAdmin">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Título</th>
+                                        <th>Categoría</th>
+                                        <th>Precio</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in articulos %}
+                                    <tr id="fila-{{ item.id }}" class="fila-producto" data-categoria="{{ item.categoria }}">
+                                        <td>{{ item.id }}</td>
+                                        <td class="col-titulo"><strong>{{ item.titulo }}</strong></td>
+                                        <td class="col-categoria">
+                                            <span class="badge bg-info text-dark" style="cursor: pointer;" onclick="filtrarAdminDirecto('{{ item.categoria }}')" title="Filtrar por esta categoría">
+                                                {{ item.categoria }}
+                                            </span>
+                                        </td>
+                                        <td>{{ item.precio }}</td>
+                                        <td>
+                                            <button class="btn btn-warning btn-sm me-1 btn-editar" 
+                                                    data-id="{{ item.id }}"
+                                                    data-titulo="{{ item.titulo }}"
+                                                    data-categoria="{{ item.categoria }}"
+                                                    data-precio="{{ item.precio }}"
+                                                    data-imagen="{{ item.imagen or '' }}"
+                                                    data-descripcion="{{ item.descripcion or '' }}"
+                                                    title="Editar">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            <button onclick="eliminarProducto({{ item.id }})" 
+                                                    class="btn btn-danger btn-sm" title="Eliminar">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted p-3">No hay artículos guardados todavía.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PARA EDITAR PRODUCTO -->
+    <div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-1"></i> Editar Producto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="form-editar">
+                        <input type="hidden" id="edit-id">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Título</label>
+                            <input type="text" id="edit-titulo" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Categoría</label>
+                            <select id="edit-categoria" class="form-select" required>
+                                {% for cat in categorias %}
+                                    <option value="{{ cat }}">{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Precio y Moneda</label>
+                            <div class="input-group">
+                                <select id="edit-moneda" class="form-select" style="max-width: 110px;">
+                                    <option value="ARS">ARS ($)</option>
+                                    <option value="USD">USD (US$)</option>
+                                </select>
+                                <input type="text" id="edit-precio" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Nueva Imagen desde PC</label>
+                            <input type="file" id="edit-imagen-archivo" class="form-control" accept="image/*">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">O URL de Imagen</label>
+                            <input type="url" id="edit-imagen-url" class="form-control">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Descripción</label>
+                            <textarea id="edit-descripcion" class="form-control" rows="3"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-semibold">
+                            <i class="bi bi-save me-1"></i> Guardar Cambios
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS DE BOOTSTRAP Y LÓGICA DE EVENTOS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Restaurar base de datos
+        async function restaurarDb(input) {
+            if (!input.files || !input.files[0]) return;
+
+            const confirmacion = confirm('¡ATENCIÓN! Esto reemplazará toda la base de datos actual con la información del archivo subido. ¿Querés continuar?');
+            if (!confirmacion) {
+                input.value = '';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('archivo_db', input.files[0]);
+
+            const response = await fetch('/admin/restaurar-db', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                alert('Base de datos restaurada con éxito.');
+                window.location.reload();
+            } else {
+                const err = await response.json();
+                alert(err.detail || 'Error al restaurar la base de datos');
+                input.value = '';
+            }
+        }
+
+        // Guardar nueva categoría
+        document.getElementById('form-categoria').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('nueva-categoria-nombre').value;
+            const formData = new FormData();
+            formData.append('nombre', nombre);
+
+            const response = await fetch('/api/categorias', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                const err = await response.json();
+                alert(err.detail || 'Error al crear la categoría');
+            }
+        });
+
+        // Eliminar categoría
+        async function eliminarCategoria(id, nombre) {
+            if (confirm(`¿Querés borrar la categoría "${nombre}"?`)) {
+                const response = await fetch(`/api/categorias/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const err = await response.json();
+                    alert(err.detail || 'Error al eliminar la categoría');
+                }
+            }
+        }
+
+        // Guardar nuevo producto
+        document.getElementById('form-producto').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('titulo', document.getElementById('titulo').value);
+            formData.append('categoria', document.getElementById('categoria').value);
+            formData.append('precio', document.getElementById('precio').value);
+            formData.append('moneda', document.getElementById('moneda').value);
+            formData.append('descripcion', document.getElementById('descripcion').value || '');
+            formData.append('imagen_url', document.getElementById('imagen_url').value || '');
+            
+            const archivoInput = document.getElementById('imagen_archivo');
+            if (archivoInput.files[0]) {
+                formData.append('imagen_archivo', archivoInput.files[0]);
+            }
+
+            const response = await fetch('/api/articulos', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error al guardar el producto');
+            }
+        });
+
+        // Cargar modal de edición
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-editar');
+            if (btn) {
+                const precioCompleto = btn.dataset.precio || '';
+                const esUSD = precioCompleto.includes('US$');
+                const precioLimpio = precioCompleto.replace('US$', '').replace('$', '').trim();
+
+                document.getElementById('edit-id').value = btn.dataset.id;
+                document.getElementById('edit-titulo').value = btn.dataset.titulo;
+                document.getElementById('edit-categoria').value = btn.dataset.categoria;
+                document.getElementById('edit-moneda').value = esUSD ? 'USD' : 'ARS';
+                document.getElementById('edit-precio').value = precioLimpio;
+                document.getElementById('edit-imagen-url').value = btn.dataset.imagen.startsWith('http') ? btn.dataset.imagen : '';
+                document.getElementById('edit-descripcion').value = btn.dataset.descripcion;
+
+                const modal = new bootstrap.Modal(document.getElementById('modalEditar'));
+                modal.show();
+            }
+        });
+
+        // Editar producto
+        document.getElementById('form-editar').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+
+            const formData = new FormData();
+            formData.append('titulo', document.getElementById('edit-titulo').value);
+            formData.append('categoria', document.getElementById('edit-categoria').value);
+            formData.append('precio', document.getElementById('edit-precio').value);
+            formData.append('moneda', document.getElementById('edit-moneda').value);
+            formData.append('descripcion', document.getElementById('edit-descripcion').value || '');
+            formData.append('imagen_url', document.getElementById('edit-imagen-url').value || '');
+            
+            const archivoInput = document.getElementById('edit-imagen-archivo');
+            if (archivoInput.files[0]) {
+                formData.append('imagen_archivo', archivoInput.files[0]);
+            }
+
+            const response = await fetch(`/api/articulos/${id}`, {
+                method: 'PUT',
+                body: formData
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error al actualizar el producto');
+            }
+        });
+
+        // Eliminar producto
+        async function eliminarProducto(id) {
+            if (confirm('¿Seguro que querés borrar este producto?')) {
+                const response = await fetch(`/api/articulos/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    document.getElementById(`fila-${id}`).remove();
+                } else {
+                    alert('Error al eliminar');
+                }
+            }
+        }
+
+        // Buscador en la tabla
+        const buscarAdmin = document.getElementById('buscarAdmin');
+        if (buscarAdmin) {
+            buscarAdmin.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                const filas = document.querySelectorAll('.fila-producto');
+
+                filas.forEach(fila => {
+                    const textoFila = fila.innerText.toLowerCase();
+                    if (textoFila.includes(query)) {
+                        fila.classList.remove('d-none');
+                    } else {
+                        fila.classList.add('d-none');
+                    }
+                });
+            });
+        }
+
+        function filtrarAdminDirecto(cat) {
+            if (buscarAdmin) {
+                buscarAdmin.value = cat;
+                buscarAdmin.dispatchEvent(new Event('input'));
+            }
+        }
+    </script>
+</body>
+</html>
